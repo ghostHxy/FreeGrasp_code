@@ -56,7 +56,9 @@ def compute_grasp_pose(path, camera_info):
         # Molmo 处理
         # --------------------------
         prompt = "Point out the objects in the red rectangle on the table."
+        print(f"[DEBUG] Starting Molmo processing for image: {image_path}")
         base64_labeled_image, labeled_text = process_and_send_to_gpt(image_path, prompt, path)
+        print(f"[DEBUG] Molmo returned: base64_labeled_image type={type(base64_labeled_image)}, labeled_text type={type(labeled_text)}")
         if base64_labeled_image is None or labeled_text is None:
             raise ValueError(f"Molmo processing failed for image: {image_path}")
 
@@ -86,6 +88,8 @@ def compute_grasp_pose(path, camera_info):
         # PIL 图片，用于 LangSAM
         # --------------------------
         image_pil = langsamutils.load_image(image_path)
+        print(f"[DEBUG] Depth data shape: {depth_ori.shape}, type: {type(depth_ori)}")
+        print(f"[DEBUG] PIL image size: {image_pil.size}, type: {type(image_pil)}")
 
         # --------------------------
         # GPT 推理部分
@@ -141,10 +145,17 @@ def compute_grasp_pose(path, camera_info):
         # --------------------------
         # LangSAM Actor
         # --------------------------
+        print(f"base64_labeled_image type: {type(base64_labeled_image)}")
+        print(f"labeled_text type: {type(labeled_text)}")
+        print(f"image_pil type: {type(image_pil)}")
+        print(f"[DEBUG] Starting LangSAM Actor prediction for goal: {goal}")
         masks, boxes, phrases, logits = langsam_actor.predict(image_pil, goal)
+        print(f"masks: {masks}, boxes: {boxes}")
+        print(f"[DEBUG] LangSAM returned: masks={masks}, boxes={boxes}")
         if masks is None or boxes is None or len(masks) == 0:
             raise ValueError(f"LangSAM prediction failed for {image_path}, goal={goal}")
         goal_mask, mask_index = get_goal_mask_with_index(masks, goal_coor)
+        print(f"[DEBUG] goal_mask type={type(goal_mask)}, mask_index={mask_index}")
         if goal_mask is None:
             raise ValueError(f"Failed to get goal mask for {image_path}, goal_coor={goal_coor}")
         goal_bbox = boxes[mask_index].cpu().numpy()
