@@ -156,9 +156,17 @@ def process_image(image_path, prompt, output_folder):
     """
     os.makedirs(output_folder, exist_ok=True)
     
-    # Load image
-    image = Image.open(image_path).convert("RGB")
-    points_with_ids = run_local_inference(image, prompt)
+     # Load image with error handling
+    if not os.path.exists(image_path):
+        raise FileNotFoundError(f"Image file not found: {image_path}")
+    
+    try:
+        image = Image.open(image_path).convert("RGB")
+        # 验证图像成功加载
+        if image is None or not hasattr(image, 'size'):
+            raise ValueError(f"Failed to load valid image from {image_path}")
+    except Exception as e:
+        raise Exception(f"Error loading image from {image_path}: {e}")
     
     # Generate labeled image
     plt.figure(figsize=(10, 8))

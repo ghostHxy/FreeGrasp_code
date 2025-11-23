@@ -20,12 +20,25 @@ def compute_grasp_pose(path, camera_info):
     args = parser.parse_args()
     
     try:
+        # 修复路径处理逻辑
         path = str(path)
-        if not path.startswith('/'):
-            path = '/' + path
+        
+        # 如果是相对路径，转换为绝对路径
+        if not os.path.isabs(path):
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            path = os.path.join(base_dir, path)
+        
+        # 规范化路径
+        path = os.path.normpath(path)
+        
         image_path = os.path.join(path, "image.png")
         depth_path = os.path.join(path, "depth.npz")
         text_path = os.path.join(path, "task.txt")
+        
+        # 验证文件存在
+        for file_path, file_type in [(image_path, "image"), (depth_path, "depth"), (text_path, "task")]:
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"{file_type.capitalize()} file not found: {file_path}")
         
         prompt = "Point out the objects in the red rectangle on the table."
 
