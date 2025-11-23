@@ -259,8 +259,11 @@ def get_prediction_result(image, path, scene_number, text):
             }
         ]
 
+        # 使用Qwen-VL模型
+        from utils.config import QWEN_MODEL
+        
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model=QWEN_MODEL,
             messages=messages,
             temperature=0,
             max_tokens=713,

@@ -79,8 +79,11 @@ def compute_grasp_pose(path, camera_info):
             "objects": []
         }
 
+        # 使用Qwen-VL模型
+        from utils.config import QWEN_MODEL
+        
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model=QWEN_MODEL,
             messages=messages,
             temperature=0,
             max_tokens=713,
@@ -92,7 +95,7 @@ def compute_grasp_pose(path, camera_info):
         output = response.choices[0].message.content
         result = process_grasping_result(output, text)
         
-        # Goal object predicted by GPT-4o (resoning part)
+        # Goal object predicted by Qwen-VL (reasoning part)
         goal = result['class_name']
         goal_id = result['selected_object_id']
         goal_coor = get_coordinates(labeled_text, goal_id)

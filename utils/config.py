@@ -3,7 +3,6 @@ import torch
 import logging
 import argparse
 import numpy as np
-from openai import OpenAI
 
 from models.langsam.langsam_actor import LangSAM
 
@@ -11,9 +10,26 @@ from models.langsam.langsam_actor import LangSAM
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Configure OpenAI API key
-api_key = os.environ["OPENAI_API_KEY"]
-client = OpenAI(api_key=api_key)
+# Configure API client - 使用阿里千问
+from utils.qwen_adapter import QwenAdapter
+
+# 设置默认API key和模型
+DEFAULT_DASHSCOPE_API_KEY = "sk-79767f4057244ae5b52f4b5d0af2f01d"
+DEFAULT_QWEN_MODEL = "qwen-vl-max"
+
+# 从环境变量读取或使用默认值
+api_key = os.environ.get("DASHSCOPE_API_KEY", DEFAULT_DASHSCOPE_API_KEY)
+qwen_model = os.environ.get("QWEN_MODEL", DEFAULT_QWEN_MODEL)
+
+# 初始化Qwen适配器
+qwen_adapter = QwenAdapter(api_key=api_key)
+client = qwen_adapter.ChatCompletion()
+
+# 导出模型名称供其他模块使用
+QWEN_MODEL = qwen_model
+
+logging.info(f"✅ Using Alibaba Qwen-VL model: {qwen_model}")
+logging.info(f"✅ DashScope API Key configured")
 
 # Initialize Ray and load actors and models
 use_gpu = torch.cuda.is_available()
