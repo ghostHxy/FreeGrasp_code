@@ -149,18 +149,25 @@ def compute_grasp_pose(path, camera_info):
 
 
 
-if __name__ == "__main__":
-    # NOTE: to change if you want to try with your own images
-    camera =  CameraInfo(width=1280, height=720, fx=912.481, fy=910.785, cx=644.943, cy=353.497, scale=1000.0)
+# 在run.py文件的第152-164行，修改为：
 
+if __name__ == "__main__":
+    # 设置相机参数
+    camera = CameraInfo(width=1280, height=720, fx=912.481, fy=910.785, cx=644.943, cy=353.497, scale=1000.0)
+
+    # 使用相对路径
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     images = [
-        "/media/tev/data/code/FreeGrasp_code/data/real_examples/hard/1",
-        "/media/tev/data/code/FreeGrasp_code/data/real_examples/hard/2",
-        "/media/tev/data/code/FreeGrasp_code/data/real_examples/hard/3",
-        ]
+        os.path.join(base_dir, "data/real_examples/hard/1"),
+        os.path.join(base_dir, "data/real_examples/hard/2"),
+        os.path.join(base_dir, "data/real_examples/hard/3"),
+    ]
     
-    for i in images:
-        print(compute_grasp_pose(i, camera))
-    
+    for i, image_path in enumerate(images, 1):
+        print(f"\n{'='*60}")
+        print(f"处理第 {i} 张图片: {image_path}")
+        print(f"{'='*60}")
+        result = compute_grasp_pose(image_path, camera)
+        print(f"结果: {result}")
         
 

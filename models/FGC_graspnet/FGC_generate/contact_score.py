@@ -1,10 +1,11 @@
-from vis_grasp import visObjGrasp, to_open3d_geometry_list
-import open3d as o3d
-import numpy as np
-import os
-from graspnetAPI.utils.utils import generate_views
-from graspnetAPI.utils.rotation import batch_viewpoint_params_to_matrix
-from tqdm import tqdm
+# 这是 GraspNet API 的一部分，用于处理抓取点的生成与联系分数计算。
+from vis_grasp import visObjGrasp, to_open3d_geometry_list  # 用于可视化抓取及转换为 Open3D 几何体
+import open3d as o3d  # Open3D，常用于三维点云和几何体处理
+import numpy as np  # NumPy，进行矩阵和数组运算
+import os  # 操作系统相关，如路径拼接
+from graspnetAPI.utils.utils import generate_views  # GraspNet API：生成不同视角
+from graspnetAPI.utils.rotation import batch_viewpoint_params_to_matrix  # GraspNet API：批量计算视点参数对应的旋转矩阵
+from tqdm import tqdm  # 进度条库
 import torch
 
 
