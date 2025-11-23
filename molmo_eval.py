@@ -8,7 +8,7 @@ import pandas as pd
 from PIL import Image
 import matplotlib.pyplot as plt
 
-from transformers import AutoModelForCausalLM, AutoProcessor, GenerationConfig
+from transformers import AutoModelForCausalLM, AutoProcessor, GenerationConfig 
 
 
 # **Upload Molmo Model**
@@ -188,17 +188,55 @@ def process_image(image_path, prompt, output_folder):
     return output_image_path, text_content
 
 
-def process_and_send_to_gpt(image_path, prompt, output_folder):
+def process_and_send_to_gpt(image_path, prompt, save_path):
     """
-    Process image with Molmo and send labeled image to GPT for further reasoning.
+    离线加载 Molmo 模型，处理图片生成标注和文本。
+    返回：
+        base64_labeled_image: PIL -> base64 编码的图像
+        labeled_text: 模型输出的标注文本
     """
-    labeled_image_path, text_content = process_image(image_path, prompt, output_folder)
-    
-    # Convert labeled image to base64
-    with open(labeled_image_path, "rb") as image_file:
-        base64_image = base64.b64encode(image_file.read()).decode("utf-8")
-    
-    return base64_image, text_content
+    # ------------------------------
+    # 本地 Molmo 模型路径
+    # ------------------------------
+    molmo_path = os.path.expanduser("~/.cache/huggingface/hub/models--allenai--Molmo-7B-D-0924")
+    print(f"[DEBUG] Loading Molmo from local path: {molmo_path}")
+
+    # ------------------------------
+    # 离线加载模型
+    # ------------------------------
+    processor = AutoProcessor.from_pretrained(molmo_path, local_files_only=True)
+    model = AutoModelForCausalLM.from_pretrained(molmo_path, local_files_only=True)
+
+    # ------------------------------
+    # 图片加载
+    # ------------------------------
+    image = Image.open(image_path).convert("RGB")
+    print(f"[DEBUG] Loaded image for Molmo: {image_path}, size: {image.size}")
+
+    # ------------------------------
+    # 模型推理
+    # ------------------------------
+    # 注意：这里的实现依赖你的 Molmo 模型实际用法
+    # 假设你有一个函数可以把 prompt + image 输入模型，输出标注文本
+    # 如果 Molmo 是多模态生成模型，可能是 processor(image, text) -> model.generate
+    inputs = processor(text=prompt, images=image, return_tensors="pt")
+    outputs = model.generate(**inputs, max_new_tokens=512)
+
+    labeled_text = processor.batch_decode(outputs, skip_special_tokens=True)[0]
+    if labeled_text is None or len(labeled_text.strip()) == 0:
+        raise ValueError("[ERROR] Molmo returned empty text!")
+
+    # ------------------------------
+    # 将标注图像保存为 base64
+    # ------------------------------
+    buffered = BytesIO()
+    image.save(buffered, format="PNG")
+    base64_labeled_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    if base64_labeled_image is None:
+        raise ValueError("[ERROR] Failed to convert image to base64!")
+
+    print(f"[DEBUG] Molmo processing done. labeled_text length: {len(labeled_text)}")
+    return base64_labeled_image, labeled_text
 
 
 # Main batch processing
