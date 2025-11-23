@@ -168,6 +168,9 @@ def process_image(image_path, prompt, output_folder):
     except Exception as e:
         raise Exception(f"Error loading image from {image_path}: {e}")
     
+     # 调用 Molmo 推理生成点坐标
+    points_with_ids = run_local_inference(image, prompt)
+    
     # Generate labeled image
     plt.figure(figsize=(10, 8))
     plt.imshow(image)
