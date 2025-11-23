@@ -132,6 +132,8 @@ def compute_grasp_pose(path, camera_info):
         goal = result['class_name']
         goal_id = result['selected_object_id']
         goal_coor = get_coordinates(labeled_text, goal_id)
+        if goal_coor is None:
+            raise ValueError(f"Failed to find coordinates for goal_id={goal_id}")
 
         with open(f"{path}/log.txt", "a") as f:
             f.write(f"I have to remove the object with id = {str(goal_id)}, named {goal}\n")
@@ -140,10 +142,16 @@ def compute_grasp_pose(path, camera_info):
         # LangSAM Actor
         # --------------------------
         masks, boxes, phrases, logits = langsam_actor.predict(image_pil, goal)
+        if masks is None or boxes is None or len(masks) == 0:
+            raise ValueError(f"LangSAM prediction failed for {image_path}, goal={goal}")
         goal_mask, mask_index = get_goal_mask_with_index(masks, goal_coor)
+        if goal_mask is None:
+            raise ValueError(f"Failed to get goal mask for {image_path}, goal_coor={goal_coor}")
         goal_bbox = boxes[mask_index].cpu().numpy()
         cropping_box = create_cropping_box_from_boxes(goal_bbox, (img_ori.shape[1], img_ori.shape[0]))
         goal_mask = goal_mask.unsqueeze(0)
+        print(f"LangSAM masks: {len(masks)}, boxes: {len(boxes)}")
+        print(f"Goal coordinates: {goal_coor}, mask_index: {mask_index}")
 
         if args.viz:
             visualize_cropping_box(img_ori, cropping_box)
