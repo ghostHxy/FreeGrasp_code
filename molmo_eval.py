@@ -121,26 +121,64 @@ def run_local_inference(image, prompt):
     """
     Run Molmo for prediction and return a list of (random ID, coordinates) pairs.
     """
+    # 添加参数验证
+    if image is None:
+        raise ValueError("run_local_inference: image parameter is None!")
+    if not hasattr(image, 'size'):
+        raise ValueError(f"run_local_inference: image has no 'size' attribute. Type: {type(image)}")
+    
     image_w, image_h = image.size
-
+    
+    # 验证 processor 和 model 是否已加载
+    if processor is None:
+        raise ValueError("Processor is not initialized!")
+    if model is None:
+        raise ValueError("Model is not initialized!")
+    
+    # 设置模型为评估模式
+    model.eval()
+    
     # Process input
     inputs = processor.process(images=[image], text=prompt)
+    # 🔥 关键修复：将输入转移到 GPU 并添加 batch 维度（这行之前缺失了！）
     inputs = {k: v.to(model.device).unsqueeze(0) for k, v in inputs.items()}
-
+    
+    # 确保没有 past_key_values 相关的键
+    if 'past_key_values' in inputs:
+        del inputs['past_key_values']
+    
     with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
-        output = model.generate_from_batch(
-            inputs,
-            GenerationConfig(
-                max_new_tokens=500,
-                do_sample=True,
-                temperature=0.2,
-                stop_strings=["<|endoftext|>"]
-            ),
-            tokenizer=processor.tokenizer
-        )
-
+        try:
+            output = model.generate_from_batch(
+                inputs,
+                GenerationConfig(
+                    max_new_tokens=500,
+                    do_sample=True,
+                    temperature=0.2,
+                    stop_strings=["<|endoftext|>"],
+                    use_cache=False  # 🔥 禁用缓存避免 past_key_values 问题
+                ),
+                tokenizer=processor.tokenizer
+            )
+        except Exception as e:
+            # 如果 generate_from_batch 失败，尝试使用标准 generate 方法
+            print(f"⚠️ generate_from_batch failed: {e}. Trying standard generate method...")
+            with torch.no_grad():
+                output = model.generate(
+                    **inputs,
+                    max_new_tokens=500,
+                    do_sample=True,
+                    temperature=0.2,
+                    use_cache=False,
+                    pad_token_id=processor.tokenizer.pad_token_id if processor.tokenizer.pad_token_id is not None else processor.tokenizer.eos_token_id
+                )
+    
     # Parse output text
-    generated_tokens = output[0, inputs['input_ids'].size(1):]
+    if isinstance(output, torch.Tensor):
+        generated_tokens = output[0, inputs['input_ids'].size(1):]
+    else:
+        generated_tokens = output[0][inputs['input_ids'].size(1):]
+    
     generated_text = processor.tokenizer.decode(generated_tokens, skip_special_tokens=True)
     
     # Extract point coordinates
@@ -156,20 +194,38 @@ def process_image(image_path, prompt, output_folder):
     """
     os.makedirs(output_folder, exist_ok=True)
     
-     # Load image with error handling
+    # 添加调试信息
+    print(f"📷 正在加载图像: {image_path}")
+    
+    # Load image with error handling
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Image file not found: {image_path}")
     
     try:
         image = Image.open(image_path).convert("RGB")
+        print(f"✅ 图像加载成功: {image.size if image else 'None'}")
+        
         # 验证图像成功加载
-        if image is None or not hasattr(image, 'size'):
-            raise ValueError(f"Failed to load valid image from {image_path}")
+        if image is None:
+            raise ValueError(f"Image.open() returned None for {image_path}")
+        if not hasattr(image, 'size'):
+            raise ValueError(f"Loaded image has no 'size' attribute: {type(image)}")
+            
+        print(f"✅ 图像验证通过: size={image.size}")
+        
     except Exception as e:
+        print(f"❌ 图像加载失败: {e}")
         raise Exception(f"Error loading image from {image_path}: {e}")
     
-     # 调用 Molmo 推理生成点坐标
-    points_with_ids = run_local_inference(image, prompt)
+    # 调用 Molmo 推理生成点坐标
+    print(f"🤖 开始 Molmo 推理...")
+    try:
+        points_with_ids = run_local_inference(image, prompt)
+        print(f"✅ Molmo 推理完成，找到 {len(points_with_ids)} 个点")
+    except Exception as e:
+        print(f"❌ Molmo 推理失败: {e}")
+        print(f"   image 类型: {type(image)}, image 是否为 None: {image is None}")
+        raise
     
     # Generate labeled image
     plt.figure(figsize=(10, 8))
