@@ -1,4 +1,10 @@
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # 抑制TensorFlow日志
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # 禁用oneDNN优化
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*DType.*')
+
 import torch
 import logging
 import argparse
