@@ -4,8 +4,6 @@ ray[all]
 transformers
 openai
 open3d_plus
---no-build-isolation git+https://github.com/IDEA-Research/GroundingDINO.git
---no-build-isolation git+https://github.com/facebookresearch/segment-anything.git
 einops
 tensorflow
 accelerate
