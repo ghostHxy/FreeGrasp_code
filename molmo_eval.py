@@ -272,31 +272,57 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
     
     print(f"[DEBUG] input_ids shape: {inputs['input_ids'].shape}")
     
-    with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
-        output = model.generate_from_batch(
-            inputs,
-            GenerationConfig(
-                max_new_tokens=500,
-                do_sample=True,
-                temperature=0.2,
-                stop_strings=["<|endoftext|>"]
-            ),
-            tokenizer=processor.tokenizer
-        )
+    try:
+        with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
+            print(f"[DEBUG] Calling model.generate_from_batch...")
+            output = model.generate_from_batch(
+                inputs,
+                GenerationConfig(
+                    max_new_tokens=500,
+                    do_sample=True,
+                    temperature=0.2,
+                    stop_strings=["<|endoftext|>"]
+                ),
+                tokenizer=processor.tokenizer
+            )
+            print(f"[DEBUG] model.generate_from_batch completed")
+    except Exception as e:
+        print(f"[ERROR] Exception in model.generate_from_batch: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
     
     # 检查 output 是否为 None
     if output is None:
         raise ValueError("[ERROR] model.generate_from_batch returned None")
     
-    print(f"[DEBUG] output shape: {output.shape}, type: {type(output)}")
+    print(f"[DEBUG] output type: {type(output)}, has shape attr: {hasattr(output, 'shape')}")
+    if hasattr(output, 'shape'):
+        print(f"[DEBUG] output shape: {output.shape}")
+    else:
+        print(f"[DEBUG] output does not have shape attribute")
     
     # 解析输出文本 - 使用更安全的方式获取 input_ids 的长度
-    if len(inputs['input_ids'].shape) >= 2:
-        input_ids_len = inputs['input_ids'].shape[1]
-    else:
-        input_ids_len = inputs['input_ids'].size(0)
+    input_ids_tensor = inputs.get('input_ids')
+    if input_ids_tensor is None:
+        raise ValueError("[ERROR] inputs['input_ids'] is None when trying to extract tokens")
     
-    generated_tokens = output[0, input_ids_len:]
+    if len(input_ids_tensor.shape) >= 2:
+        input_ids_len = input_ids_tensor.shape[1]
+    elif len(input_ids_tensor.shape) == 1:
+        input_ids_len = input_ids_tensor.shape[0]
+    else:
+        raise ValueError(f"[ERROR] Unexpected input_ids shape: {input_ids_tensor.shape}")
+    
+    print(f"[DEBUG] input_ids_len: {input_ids_len}, output shape: {output.shape if hasattr(output, 'shape') else 'no shape'}")
+    
+    try:
+        generated_tokens = output[0, input_ids_len:]
+        print(f"[DEBUG] generated_tokens shape: {generated_tokens.shape if hasattr(generated_tokens, 'shape') else 'no shape'}")
+    except Exception as e:
+        print(f"[ERROR] Failed to slice output: {type(e).__name__}: {e}")
+        print(f"[ERROR] output type: {type(output)}, output value: {output}")
+        raise
     labeled_text = processor.tokenizer.decode(generated_tokens, skip_special_tokens=True)
     
     if labeled_text is None or len(labeled_text.strip()) == 0:
