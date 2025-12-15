@@ -112,7 +112,7 @@ def remove_invisible_grasp_points(cloud, grasp_points, pose, th=0.01):
                 if the minimum distance between a grasp point and the scene points is greater than outlier, the point will be removed
 
         Output:
-            visible_mask: [np.ndarray, (M,), np.bool]
+            visible_mask: [np.ndarray, (M,), np.bool_]
                 mask to show the visible part of grasp points
     """
     grasp_points_trans = transform_point_cloud(grasp_points, pose)
@@ -137,7 +137,7 @@ def get_workspace_mask(cloud, seg, trans=None, organized=True, outlier=0):
                 if the distance between a point and workspace is greater than outlier, the point will be removed
                 
         Output:
-            workspace_mask: [np.ndarray, (H,W)/(H*W,), np.bool]
+            workspace_mask: [np.ndarray, (H,W)/(H*W,), np.bool_]
                 mask to indicate whether scene points are in workspace
     """
     if organized:
