@@ -247,8 +247,31 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
     # ------------------------------
     # 使用 processor.process 方法处理输入
     inputs = processor.process(images=[image], text=prompt)
-    inputs = {k: v.to(model.device).unsqueeze(0) for k, v in inputs.items()}
-
+    
+    # 添加调试信息和错误检查
+    print(f"[DEBUG] processor.process returned keys: {list(inputs.keys()) if isinstance(inputs, dict) else 'Not a dict'}")
+    print(f"[DEBUG] inputs type: {type(inputs)}")
+    
+    # 检查 inputs 是否是字典且包含必要的键
+    if not isinstance(inputs, dict):
+        raise ValueError(f"[ERROR] processor.process returned non-dict: {type(inputs)}")
+    
+    if 'input_ids' not in inputs:
+        raise ValueError(f"[ERROR] 'input_ids' not in inputs. Available keys: {list(inputs.keys())}")
+    
+    # 检查 input_ids 是否为 None
+    if inputs['input_ids'] is None:
+        raise ValueError("[ERROR] inputs['input_ids'] is None")
+    
+    # 将输入移动到设备并添加 batch 维度
+    inputs = {k: v.to(model.device).unsqueeze(0) if v is not None else None for k, v in inputs.items()}
+    
+    # 再次验证 input_ids 不为 None（处理后的检查）
+    if inputs.get('input_ids') is None:
+        raise ValueError("[ERROR] inputs['input_ids'] is None after processing")
+    
+    print(f"[DEBUG] input_ids shape: {inputs['input_ids'].shape}")
+    
     with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
         output = model.generate_from_batch(
             inputs,
@@ -260,9 +283,20 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
             ),
             tokenizer=processor.tokenizer
         )
-
-    # 解析输出文本
-    generated_tokens = output[0, inputs['input_ids'].size(1):]
+    
+    # 检查 output 是否为 None
+    if output is None:
+        raise ValueError("[ERROR] model.generate_from_batch returned None")
+    
+    print(f"[DEBUG] output shape: {output.shape}, type: {type(output)}")
+    
+    # 解析输出文本 - 使用更安全的方式获取 input_ids 的长度
+    if len(inputs['input_ids'].shape) >= 2:
+        input_ids_len = inputs['input_ids'].shape[1]
+    else:
+        input_ids_len = inputs['input_ids'].size(0)
+    
+    generated_tokens = output[0, input_ids_len:]
     labeled_text = processor.tokenizer.decode(generated_tokens, skip_special_tokens=True)
     
     if labeled_text is None or len(labeled_text.strip()) == 0:
