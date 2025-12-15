@@ -243,17 +243,32 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
     print(f"[DEBUG] Loaded image for Molmo: {image_path}, size: {image.size}")
 
     # ------------------------------
-    # 模型推理
+    # 模型推理（使用与 run_local_inference 相同的调用方式）
     # ------------------------------
-    # 注意：这里的实现依赖你的 Molmo 模型实际用法
-    # 假设你有一个函数可以把 prompt + image 输入模型，输出标注文本
-    # 如果 Molmo 是多模态生成模型，可能是 processor(image, text) -> model.generate
-    inputs = processor(text=prompt, images=image, return_tensors="pt")
-    outputs = model.generate(**inputs, max_new_tokens=512)
+    # 使用 processor.process 方法处理输入
+    inputs = processor.process(images=[image], text=prompt)
+    inputs = {k: v.to(model.device).unsqueeze(0) for k, v in inputs.items()}
 
-    labeled_text = processor.batch_decode(outputs, skip_special_tokens=True)[0]
+    with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
+        output = model.generate_from_batch(
+            inputs,
+            GenerationConfig(
+                max_new_tokens=500,
+                do_sample=True,
+                temperature=0.2,
+                stop_strings=["<|endoftext|>"]
+            ),
+            tokenizer=processor.tokenizer
+        )
+
+    # 解析输出文本
+    generated_tokens = output[0, inputs['input_ids'].size(1):]
+    labeled_text = processor.tokenizer.decode(generated_tokens, skip_special_tokens=True)
+    
     if labeled_text is None or len(labeled_text.strip()) == 0:
         raise ValueError("[ERROR] Molmo returned empty text!")
+    
+    print(f"[DEBUG] Molmo generated text: {labeled_text}")
 
     # ------------------------------
     # 将标注图像保存为 base64
