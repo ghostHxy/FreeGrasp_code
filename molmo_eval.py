@@ -281,6 +281,7 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
                     max_new_tokens=500,
                     do_sample=True,
                     temperature=0.2,
+                    use_cache=False,
                     stop_strings=["<|endoftext|>"]
                 ),
                 tokenizer=processor.tokenizer
