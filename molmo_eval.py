@@ -202,10 +202,39 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
     print(f"[DEBUG] Loading Molmo from local path: {molmo_path}")
 
     # ------------------------------
-    # 离线加载模型
+    # 加载模型（优先本地，失败则从 HuggingFace 下载）
     # ------------------------------
-    processor = AutoProcessor.from_pretrained(molmo_path, local_files_only=True)
-    model = AutoModelForCausalLM.from_pretrained(molmo_path, local_files_only=True)
+    try:
+        # 先尝试从本地加载
+        print("[INFO] Attempting to load Molmo from local cache...")
+        processor = AutoProcessor.from_pretrained(
+            molmo_path, 
+            local_files_only=True,
+            trust_remote_code=True
+        )
+        model = AutoModelForCausalLM.from_pretrained(
+            molmo_path, 
+            local_files_only=True,
+            trust_remote_code=True,
+            torch_dtype=torch.float16,
+            device_map='auto'
+        )
+        print("[INFO] Successfully loaded Molmo from local cache")
+    except Exception as e:
+        print(f"[WARNING] Failed to load from local cache: {e}")
+        print("[INFO] Downloading Molmo from HuggingFace...")
+        # 如果本地加载失败，从 HuggingFace 下载
+        processor = AutoProcessor.from_pretrained(
+            'allenai/Molmo-7B-D-0924',
+            trust_remote_code=True
+        )
+        model = AutoModelForCausalLM.from_pretrained(
+            'allenai/Molmo-7B-D-0924',
+            trust_remote_code=True,
+            torch_dtype=torch.float16,
+            device_map='auto'
+        )
+        print("[INFO] Successfully downloaded and loaded Molmo from HuggingFace")
 
     # ------------------------------
     # 图片加载
@@ -229,7 +258,7 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
     # ------------------------------
     # 将标注图像保存为 base64
     # ------------------------------
-    buffered = BytesIO()
+    buffered = io.BytesIO()
     image.save(buffered, format="PNG")
     base64_labeled_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
     if base64_labeled_image is None:

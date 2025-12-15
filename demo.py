@@ -14,9 +14,14 @@ os.makedirs(TMP_DIR, exist_ok=True)
 
 
 def read_file(path):
-    with open(path, 'r') as f:
-        content = f.read()
-    return content
+    if path is None:
+        return "File not found"
+    try:
+        with open(path, 'r') as f:
+            content = f.read()
+        return content
+    except Exception as e:
+        return f"Error reading file: {str(e)}"
 
 
 def exists(label, ext):
@@ -52,7 +57,13 @@ def get_grasp_pose(text_prompt, rgb_image, depth_file, _fx, _fy, _cx, _cy, _scal
     camera = CameraInfo(width=_width, height=_height, fx=_fx,
                         fy=_fy, cx=_cx, cy=_cy, scale=_scale)
 
-    grasp_dict = compute_grasp_pose(TMP_DIR, camera)
+    try:
+        grasp_dict = compute_grasp_pose(TMP_DIR, camera)
+    except Exception as e:
+        error_msg = f"Error in compute_grasp_pose: {str(e)}"
+        print(f"⚠️ {error_msg}")
+        grasp_dict = {"error": error_msg}
+
     molmo = exists("molmo_label", "png")
 
     gpt_path = exists("log", "txt")
