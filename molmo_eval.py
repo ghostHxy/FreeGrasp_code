@@ -81,7 +81,6 @@ def run_molmo_inference(image, prompt):
                 use_cache=True
             ),
             tokenizer=processor.tokenizer,
-            prefill_chunk_size=256
         )
 
     generated_tokens = output[0, inputs['input_ids'].size(1):]
@@ -164,7 +163,6 @@ def run_local_inference(image, prompt):
                 use_cache=True
             ),
             tokenizer=processor.tokenizer,
-            prefill_chunk_size=256
         )
 
     # Parse output text
@@ -256,7 +254,6 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
                     use_cache=True
                 ),
                 tokenizer=processor.tokenizer,
-                prefill_chunk_size=256  # Process in smaller chunks to avoid cache issues
             )
         print(f"[DEBUG] model.generate_from_batch completed")
     except Exception as e:
