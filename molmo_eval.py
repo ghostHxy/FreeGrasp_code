@@ -190,91 +190,25 @@ def process_image(image_path, prompt, output_folder):
 
 def process_and_send_to_gpt(image_path, prompt, save_path):
     """
-    离线加载 Molmo 模型，处理图片生成标注和文本。
-    返回：
-        base64_labeled_image: PIL -> base64 编码的图像
-        labeled_text: 模型输出的标注文本
+    Process image using the already-loaded global Molmo model.
+    Returns:
+        base64_labeled_image: PIL -> base64 encoded image
+        labeled_text: model output text
     """
-    # ------------------------------
-    # 本地 Molmo 模型路径
-    # ------------------------------
-    molmo_path = os.path.expanduser("~/.cache/huggingface/hub/models--allenai--Molmo-7B-D-0924")
-    print(f"[DEBUG] Loading Molmo from local path: {molmo_path}")
-
-    # ------------------------------
-    # 加载模型（优先本地，失败则从 HuggingFace 下载）
-    # ------------------------------
-    try:
-        # 先尝试从本地加载
-        print("[INFO] Attempting to load Molmo from local cache...")
-        processor = AutoProcessor.from_pretrained(
-            molmo_path, 
-            local_files_only=True,
-            trust_remote_code=True
-        )
-        model = AutoModelForCausalLM.from_pretrained(
-            molmo_path, 
-            local_files_only=True,
-            trust_remote_code=True,
-            torch_dtype=torch.float16,
-            device_map='auto'
-        )
-        print("[INFO] Successfully loaded Molmo from local cache")
-    except Exception as e:
-        print(f"[WARNING] Failed to load from local cache: {e}")
-        print("[INFO] Downloading Molmo from HuggingFace...")
-        # 如果本地加载失败，从 HuggingFace 下载
-        processor = AutoProcessor.from_pretrained(
-            'allenai/Molmo-7B-D-0924',
-            trust_remote_code=True
-        )
-        model = AutoModelForCausalLM.from_pretrained(
-            'allenai/Molmo-7B-D-0924',
-            trust_remote_code=True,
-            torch_dtype=torch.float16,
-            device_map='auto'
-        )
-        print("[INFO] Successfully downloaded and loaded Molmo from HuggingFace")
-
-    # ------------------------------
-    # 图片加载
-    # ------------------------------
+    # DON'T reload the model - use the global one!
+    # The model is already loaded at module level
+    
+    # Load image
     image = Image.open(image_path).convert("RGB")
     print(f"[DEBUG] Loaded image for Molmo: {image_path}, size: {image.size}")
 
-    # ------------------------------
-    # 模型推理（使用与 run_local_inference 相同的调用方式）
-    # ------------------------------
-    # 使用 processor.process 方法处理输入
+    # Process input using global processor
     inputs = processor.process(images=[image], text=prompt)
-    
-    # 添加调试信息和错误检查
-    print(f"[DEBUG] processor.process returned keys: {list(inputs.keys()) if isinstance(inputs, dict) else 'Not a dict'}")
-    print(f"[DEBUG] inputs type: {type(inputs)}")
-    
-    # 检查 inputs 是否是字典且包含必要的键
-    if not isinstance(inputs, dict):
-        raise ValueError(f"[ERROR] processor.process returned non-dict: {type(inputs)}")
-    
-    if 'input_ids' not in inputs:
-        raise ValueError(f"[ERROR] 'input_ids' not in inputs. Available keys: {list(inputs.keys())}")
-    
-    # 检查 input_ids 是否为 None
-    if inputs['input_ids'] is None:
-        raise ValueError("[ERROR] inputs['input_ids'] is None")
-    
-    # 将输入移动到设备并添加 batch 维度
-    inputs = {k: v.to(model.device).unsqueeze(0) if v is not None else None for k, v in inputs.items()}
-    
-    # 再次验证 input_ids 不为 None（处理后的检查）
-    if inputs.get('input_ids') is None:
-        raise ValueError("[ERROR] inputs['input_ids'] is None after processing")
-    
-    print(f"[DEBUG] input_ids shape: {inputs['input_ids'].shape}")
-    
-    try:
-        with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
-            output = model.generate_from_batch(
+    inputs = {k: v.to(model.device).unsqueeze(0) for k, v in inputs.items()}
+
+    # Generate using global model
+    with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
+        output = model.generate_from_batch(
             inputs,
             GenerationConfig(
                 max_new_tokens=500,
@@ -283,61 +217,19 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
                 stop_strings=["<|endoftext|>"]
             ),
             tokenizer=processor.tokenizer
-    )
-        print(f"[DEBUG] model.generate completed")
-    except Exception as e:
-        print(f"[ERROR] Exception in model.generate: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
-    # 检查 output 是否为 None
-    if output is None:
-        raise ValueError("[ERROR] model.generate_from_batch returned None")
-    
-    print(f"[DEBUG] output type: {type(output)}, has shape attr: {hasattr(output, 'shape')}")
-    if hasattr(output, 'shape'):
-        print(f"[DEBUG] output shape: {output.shape}")
-    else:
-        print(f"[DEBUG] output does not have shape attribute")
-    
-    # 解析输出文本 - 使用更安全的方式获取 input_ids 的长度
-    input_ids_tensor = inputs.get('input_ids')
-    if input_ids_tensor is None:
-        raise ValueError("[ERROR] inputs['input_ids'] is None when trying to extract tokens")
-    
-    if len(input_ids_tensor.shape) >= 2:
-        input_ids_len = input_ids_tensor.shape[1]
-    elif len(input_ids_tensor.shape) == 1:
-        input_ids_len = input_ids_tensor.shape[0]
-    else:
-        raise ValueError(f"[ERROR] Unexpected input_ids shape: {input_ids_tensor.shape}")
-    
-    print(f"[DEBUG] input_ids_len: {input_ids_len}, output shape: {output.shape if hasattr(output, 'shape') else 'no shape'}")
-    
-    try:
-        generated_tokens = output[0, input_ids_len:]
-        print(f"[DEBUG] generated_tokens shape: {generated_tokens.shape if hasattr(generated_tokens, 'shape') else 'no shape'}")
-    except Exception as e:
-        print(f"[ERROR] Failed to slice output: {type(e).__name__}: {e}")
-        print(f"[ERROR] output type: {type(output)}, output value: {output}")
-        raise
+        )
+
+    # Decode output
+    generated_tokens = output[0, inputs['input_ids'].size(1):]
     labeled_text = processor.tokenizer.decode(generated_tokens, skip_special_tokens=True)
-    
-    if labeled_text is None or len(labeled_text.strip()) == 0:
-        raise ValueError("[ERROR] Molmo returned empty text!")
     
     print(f"[DEBUG] Molmo generated text: {labeled_text}")
 
-    # ------------------------------
-    # 将标注图像保存为 base64
-    # ------------------------------
+    # Convert image to base64
     buffered = io.BytesIO()
     image.save(buffered, format="PNG")
     base64_labeled_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    if base64_labeled_image is None:
-        raise ValueError("[ERROR] Failed to convert image to base64!")
 
-    print(f"[DEBUG] Molmo processing done. labeled_text length: {len(labeled_text)}")
     return base64_labeled_image, labeled_text
 
 
