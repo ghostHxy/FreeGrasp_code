@@ -274,15 +274,16 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
     
     try:
         with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
-            print(f"[DEBUG] Calling model.generate_from_batch...")
-            output = model.generate(
-                **inputs,
+            output = model.generate_from_batch(
+            inputs,
+            GenerationConfig(
                 max_new_tokens=500,
                 do_sample=True,
                 temperature=0.2,
-                use_cache=True,
-            
-        )
+                stop_strings=["<|endoftext|>"]
+            ),
+            tokenizer=processor.tokenizer
+    )
         print(f"[DEBUG] model.generate completed")
     except Exception as e:
         print(f"[ERROR] Exception in model.generate: {type(e).__name__}: {e}")
