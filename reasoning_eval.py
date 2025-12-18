@@ -111,7 +111,7 @@ def process_dataset(df, dataset_root, molmo_output_root, output_json_path):
     print(f"\n🎯 Accuracy: {accuracy:.2%} ({correct_count}/{len(df)})")
     print(f"📂 Results saved to {output_json_path}")
 
-
+  
 if __name__ == "__main__":
     # Path of dataset
     PARQUET_FILES = [

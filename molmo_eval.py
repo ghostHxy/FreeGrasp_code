@@ -195,33 +195,52 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
         base64_labeled_image: PIL -> base64 encoded image
         labeled_text: model output text
     """
-    # DON'T reload the model - use the global one!
-    # The model is already loaded at module level
-    
     # Load image
     image = Image.open(image_path).convert("RGB")
     print(f"[DEBUG] Loaded image for Molmo: {image_path}, size: {image.size}")
 
     # Process input using global processor
     inputs = processor.process(images=[image], text=prompt)
-    inputs = {k: v.to(model.device).unsqueeze(0) for k, v in inputs.items()}
+    print(f"[DEBUG] processor.process returned keys: {inputs.keys()}")
+    for k, v in inputs.items():
+        print(f"[DEBUG] {k}: type={type(v)}, is_none={v is None}")
+    # IMPORTANT: Handle None values and add batch dimension
+    inputs = {k: v.to(model.device).unsqueeze(0) if v is not None else None 
+              for k, v in inputs.items()}
+    
+    # Verify input_ids is not None
+    if inputs.get('input_ids') is None:
+        raise ValueError("[ERROR] inputs['input_ids'] is None after processing")
+
+    print(f"[DEBUG] input_ids shape: {inputs['input_ids'].shape}")
 
     # Generate using global model
-    with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
-        output = model.generate_from_batch(
-            inputs,
-            GenerationConfig(
-                max_new_tokens=500,
-                do_sample=True,
-                temperature=0.2,
-                stop_strings=["<|endoftext|>"]
-            ),
-            tokenizer=processor.tokenizer
-        )
+    try:
+        with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
+            output = model.generate_from_batch(
+                inputs,
+                GenerationConfig(
+                    max_new_tokens=500,
+                    do_sample=True,
+                    temperature=0.2,
+                    stop_strings=["<|endoftext|>"]
+                ),
+                tokenizer=processor.tokenizer
+            )
+        print(f"[DEBUG] model.generate_from_batch completed")
+    except Exception as e:
+        print(f"[ERROR] Exception during generation: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
     # Decode output
-    generated_tokens = output[0, inputs['input_ids'].size(1):]
+    input_length = inputs['input_ids'].size(1)
+    generated_tokens = output[0, input_length:]
     labeled_text = processor.tokenizer.decode(generated_tokens, skip_special_tokens=True)
+    
+    if not labeled_text or len(labeled_text.strip()) == 0:
+        raise ValueError("[ERROR] Molmo returned empty text!")
     
     print(f"[DEBUG] Molmo generated text: {labeled_text}")
 
