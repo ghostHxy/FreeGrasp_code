@@ -10,18 +10,41 @@ from models.FGC_graspnet.utils.data_utils import create_point_cloud_from_depth_i
 
 from utils.config import client, langsam_actor, api_key
 
-def get_coordinates(labeled_text, goal_id):
+def get_coordinates(labeled_text, goal_id, image_w=1280, image_h=720):
     """
     Extract the (X, Y) coordinates for a given goal_id.
+    Supports both XML format from Molmo and line-based format.
     """
     if isinstance(labeled_text, str):
-        lines = labeled_text.strip().split("\n")[1:]  # Skip the header
+        # Check if it's XML format from Molmo (contains <points)
+        if '<points' in labeled_text or 'x1=' in labeled_text:
+            # Parse XML format: x1="44.8" y1="44.7" x2="49.7" y2="24.2" ...
+            # Find coordinates for the specific goal_id
+            x_pattern = f'x{goal_id}="\\s*([0-9]+(?:\\.[0-9]+)?)"'
+            y_pattern = f'y{goal_id}="\\s*([0-9]+(?:\\.[0-9]+)?)"'
+
+            x_match = re.search(x_pattern, labeled_text)
+            y_match = re.search(y_pattern, labeled_text)
+
+            if x_match and y_match:
+                x_percent = float(x_match.group(1))
+                y_percent = float(y_match.group(1))
+                # Convert percentage to pixel coordinates
+                pixel_x = int((x_percent / 100) * image_w)
+                pixel_y = int((y_percent / 100) * image_h)
+                return pixel_x, pixel_y
+            return None
+        else:
+            # Original line-based format
+            lines = labeled_text.strip().split("\n")[1:]  # Skip the header
     elif isinstance(labeled_text, list):
         lines = labeled_text[1:]
-    
+    else:
+        return None
+
     for line in lines:
         parts = line.split()
-        if int(parts[0]) == goal_id:
+        if len(parts) >= 3 and int(parts[0]) == goal_id:
             return int(parts[1]), int(parts[2])
     return None  # Return None if not found
 

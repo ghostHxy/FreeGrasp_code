@@ -138,7 +138,10 @@ def compute_grasp_pose(path, camera_info):
         goal = result['class_name']
         goal_id = result['selected_object_id']
         print(f"[DEBUG] labeled_text type: {type(labeled_text)}, content: {labeled_text[:200] if isinstance(labeled_text, str) else labeled_text}")
-        goal_coor = get_coordinates(labeled_text, goal_id)
+        # Get image dimensions for coordinate conversion
+        image_w, image_h = image.size
+        goal_coor = get_coordinates(labeled_text, goal_id, image_w, image_h)
+        print(f"[DEBUG] goal_coor for goal_id={goal_id}: {goal_coor}")
         if goal_coor is None:
             raise ValueError(f"Failed to find coordinates for goal_id={goal_id}")
 
