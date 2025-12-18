@@ -17,41 +17,16 @@ def patch_molmo_model(model):
     """
     original_forward = model.model.forward
 
-    def patched_forward(
-        input_ids=None,
-        inputs_embeds=None,
-        attention_mask=None,
-        attention_bias=None,
-        position_ids=None,
-        past_key_values=None,
-        use_cache=None,
-        output_hidden_states=None,
-        images=None,
-        image_input_idx=None,
-        image_masks=None,
-        **kwargs
-    ):
+    def patched_forward(*args, **kwargs):
         # Fix: Handle None values in past_key_values
+        past_key_values = kwargs.get('past_key_values', None)
         if past_key_values is not None:
             # Check if it's a list/tuple with None values inside
             if isinstance(past_key_values, (list, tuple)) and len(past_key_values) > 0:
                 if past_key_values[0] is None or (isinstance(past_key_values[0], (list, tuple)) and past_key_values[0][0] is None):
-                    past_key_values = None
+                    kwargs['past_key_values'] = None
 
-        return original_forward(
-            input_ids=input_ids,
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            attention_bias=attention_bias,
-            position_ids=position_ids,
-            past_key_values=past_key_values,
-            use_cache=use_cache,
-            output_hidden_states=output_hidden_states,
-            images=images,
-            image_input_idx=image_input_idx,
-            image_masks=image_masks,
-            **kwargs
-        )
+        return original_forward(*args, **kwargs)
 
     model.model.forward = patched_forward
     return model
