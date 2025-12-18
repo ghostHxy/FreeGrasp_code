@@ -8,7 +8,53 @@ import pandas as pd
 from PIL import Image
 import matplotlib.pyplot as plt
 
-from transformers import AutoModelForCausalLM, AutoProcessor, GenerationConfig 
+from transformers import AutoModelForCausalLM, AutoProcessor, GenerationConfig
+
+
+def patch_molmo_model(model):
+    """
+    Patch the Molmo model to fix the KV cache bug where past_key_values[0][0] is None.
+    """
+    original_forward = model.model.forward
+
+    def patched_forward(
+        input_ids=None,
+        inputs_embeds=None,
+        attention_mask=None,
+        attention_bias=None,
+        position_ids=None,
+        past_key_values=None,
+        use_cache=None,
+        output_hidden_states=None,
+        images=None,
+        image_input_idx=None,
+        image_masks=None,
+        **kwargs
+    ):
+        # Fix: Handle None values in past_key_values
+        if past_key_values is not None:
+            # Check if it's a list/tuple with None values inside
+            if isinstance(past_key_values, (list, tuple)) and len(past_key_values) > 0:
+                if past_key_values[0] is None or (isinstance(past_key_values[0], (list, tuple)) and past_key_values[0][0] is None):
+                    past_key_values = None
+
+        return original_forward(
+            input_ids=input_ids,
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            attention_bias=attention_bias,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            use_cache=use_cache,
+            output_hidden_states=output_hidden_states,
+            images=images,
+            image_input_idx=image_input_idx,
+            image_masks=image_masks,
+            **kwargs
+        )
+
+    model.model.forward = patched_forward
+    return model
 
 
 # **Upload Molmo Model**
@@ -25,6 +71,9 @@ model = AutoModelForCausalLM.from_pretrained(
     torch_dtype=torch.float16,
     device_map='auto'
 )
+
+# Apply the patch to fix KV cache bug
+model = patch_molmo_model(model)
 
 
 # Extract (x, y) coordinates from Molmo output
