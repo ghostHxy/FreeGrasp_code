@@ -52,11 +52,12 @@ def run_molmo_inference(image, prompt):
             images=inputs['images'],
             image_input_idx=inputs['image_input_idx'],
             image_masks=inputs['image_masks'],
+            attention_mask=torch.ones_like(inputs['input_ids']),
             max_new_tokens=500,
             do_sample=True,
             temperature=0.2,
             eos_token_id=processor.tokenizer.eos_token_id,
-            use_cache=True
+            use_cache=False
         )
 
     generated_tokens = output[0, inputs['input_ids'].size(1):]
@@ -134,11 +135,12 @@ def run_local_inference(image, prompt):
             images=inputs['images'],
             image_input_idx=inputs['image_input_idx'],
             image_masks=inputs['image_masks'],
+            attention_mask=torch.ones_like(inputs['input_ids']),
             max_new_tokens=500,
             do_sample=True,
             temperature=0.2,
             eos_token_id=processor.tokenizer.eos_token_id,
-            use_cache=True
+            use_cache=False
         )
 
     # Parse output text
@@ -224,11 +226,12 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
                 images=inputs['images'],
                 image_input_idx=inputs['image_input_idx'],
                 image_masks=inputs['image_masks'],
+                attention_mask=torch.ones_like(inputs['input_ids']),
                 max_new_tokens=500,
                 do_sample=True,
                 temperature=0.2,
                 eos_token_id=processor.tokenizer.eos_token_id,
-                use_cache=True
+                use_cache=False
             )
         print(f"[DEBUG] model.generate completed")
     except Exception as e:
