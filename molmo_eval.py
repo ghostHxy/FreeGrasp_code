@@ -53,7 +53,8 @@ def run_molmo_inference(image, prompt):
                 max_new_tokens=500,
                 do_sample=True,
                 temperature=0.2,
-                stop_strings=["<|endoftext|>"]
+                stop_strings=["<|endoftext|>"],
+                use_cache=False
             ),
             tokenizer=processor.tokenizer
         )
@@ -134,7 +135,8 @@ def run_local_inference(image, prompt):
                 max_new_tokens=500,
                 do_sample=True,
                 temperature=0.2,
-                stop_strings=["<|endoftext|>"]
+                stop_strings=["<|endoftext|>"],
+                use_cache=False
             ),
             tokenizer=processor.tokenizer
         )
@@ -223,7 +225,8 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
                     max_new_tokens=500,
                     do_sample=True,
                     temperature=0.2,
-                    stop_strings=["<|endoftext|>"]
+                    stop_strings=["<|endoftext|>"],
+                    use_cache=False
                 ),
                 tokenizer=processor.tokenizer
             )
