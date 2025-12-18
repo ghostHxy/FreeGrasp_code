@@ -47,16 +47,16 @@ def run_molmo_inference(image, prompt):
     inputs = {k: v.to(model.device).unsqueeze(0) for k, v in inputs.items()}
 
     with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
-        output = model.generate_from_batch(
-            inputs,
-            GenerationConfig(
-                max_new_tokens=500,
-                do_sample=True,
-                temperature=0.2,
-                stop_strings=["<|endoftext|>"],
-                use_cache=False
-            ),
-            tokenizer=processor.tokenizer
+        output = model.generate(
+            input_ids=inputs['input_ids'],
+            images=inputs['images'],
+            image_input_idx=inputs['image_input_idx'],
+            image_masks=inputs['image_masks'],
+            max_new_tokens=500,
+            do_sample=True,
+            temperature=0.2,
+            eos_token_id=processor.tokenizer.eos_token_id,
+            use_cache=True
         )
 
     generated_tokens = output[0, inputs['input_ids'].size(1):]
@@ -129,16 +129,16 @@ def run_local_inference(image, prompt):
     inputs = {k: v.to(model.device).unsqueeze(0) for k, v in inputs.items()}
 
     with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
-        output = model.generate_from_batch(
-            inputs,
-            GenerationConfig(
-                max_new_tokens=500,
-                do_sample=True,
-                temperature=0.2,
-                stop_strings=["<|endoftext|>"],
-                use_cache=False
-            ),
-            tokenizer=processor.tokenizer
+        output = model.generate(
+            input_ids=inputs['input_ids'],
+            images=inputs['images'],
+            image_input_idx=inputs['image_input_idx'],
+            image_masks=inputs['image_masks'],
+            max_new_tokens=500,
+            do_sample=True,
+            temperature=0.2,
+            eos_token_id=processor.tokenizer.eos_token_id,
+            use_cache=True
         )
 
     # Parse output text
@@ -219,18 +219,18 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
     # Generate using global model
     try:
         with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
-            output = model.generate_from_batch(
-                inputs,
-                GenerationConfig(
-                    max_new_tokens=500,
-                    do_sample=True,
-                    temperature=0.2,
-                    stop_strings=["<|endoftext|>"],
-                    use_cache=False
-                ),
-                tokenizer=processor.tokenizer
+            output = model.generate(
+                input_ids=inputs['input_ids'],
+                images=inputs['images'],
+                image_input_idx=inputs['image_input_idx'],
+                image_masks=inputs['image_masks'],
+                max_new_tokens=500,
+                do_sample=True,
+                temperature=0.2,
+                eos_token_id=processor.tokenizer.eos_token_id,
+                use_cache=True
             )
-        print(f"[DEBUG] model.generate_from_batch completed")
+        print(f"[DEBUG] model.generate completed")
     except Exception as e:
         print(f"[ERROR] Exception during generation: {type(e).__name__}: {e}")
         import traceback
