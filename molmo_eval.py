@@ -46,6 +46,9 @@ def run_molmo_inference(image, prompt):
     inputs = processor.process(images=[image], text=prompt)
     inputs = {k: v.to(model.device).unsqueeze(0) for k, v in inputs.items()}
 
+    seq_len = inputs['input_ids'].size(1)
+    position_ids = torch.arange(seq_len, device=inputs['input_ids'].device).unsqueeze(0)
+
     with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
         output = model.generate(
             input_ids=inputs['input_ids'],
@@ -53,6 +56,7 @@ def run_molmo_inference(image, prompt):
             image_input_idx=inputs['image_input_idx'],
             image_masks=inputs['image_masks'],
             attention_mask=torch.ones_like(inputs['input_ids']),
+            position_ids=position_ids,
             max_new_tokens=500,
             do_sample=True,
             temperature=0.2,
@@ -129,6 +133,9 @@ def run_local_inference(image, prompt):
     inputs = processor.process(images=[image], text=prompt)
     inputs = {k: v.to(model.device).unsqueeze(0) for k, v in inputs.items()}
 
+    seq_len = inputs['input_ids'].size(1)
+    position_ids = torch.arange(seq_len, device=inputs['input_ids'].device).unsqueeze(0)
+
     with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
         output = model.generate(
             input_ids=inputs['input_ids'],
@@ -136,6 +143,7 @@ def run_local_inference(image, prompt):
             image_input_idx=inputs['image_input_idx'],
             image_masks=inputs['image_masks'],
             attention_mask=torch.ones_like(inputs['input_ids']),
+            position_ids=position_ids,
             max_new_tokens=500,
             do_sample=True,
             temperature=0.2,
@@ -220,6 +228,9 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
 
     # Generate using global model
     try:
+        seq_len = inputs['input_ids'].size(1)
+        position_ids = torch.arange(seq_len, device=inputs['input_ids'].device).unsqueeze(0)
+
         with torch.autocast(device_type="cuda", enabled=True, dtype=torch.float16):
             output = model.generate(
                 input_ids=inputs['input_ids'],
@@ -227,6 +238,7 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
                 image_input_idx=inputs['image_input_idx'],
                 image_masks=inputs['image_masks'],
                 attention_mask=torch.ones_like(inputs['input_ids']),
+                position_ids=position_ids,
                 max_new_tokens=500,
                 do_sample=True,
                 temperature=0.2,
