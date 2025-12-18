@@ -23,7 +23,20 @@ qwen_model = os.environ.get("QWEN_MODEL", DEFAULT_QWEN_MODEL)
 
 # 初始化Qwen适配器
 qwen_adapter = QwenAdapter(api_key=api_key)
-client = qwen_adapter.ChatCompletion()
+
+# Create a wrapper that supports OpenAI-style client.chat.completions.create()
+class _ChatCompletions:
+    @staticmethod
+    def create(*args, **kwargs):
+        return qwen_adapter.ChatCompletion.create(*args, **kwargs)
+
+class _Chat:
+    completions = _ChatCompletions()
+
+class _Client:
+    chat = _Chat()
+
+client = _Client()
 
 # 导出模型名称供其他模块使用
 QWEN_MODEL = qwen_model
