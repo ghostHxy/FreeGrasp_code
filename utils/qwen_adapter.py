@@ -98,8 +98,21 @@ class QwenAdapter:
                 
                 # 转换为OpenAI格式的响应
                 if response.status_code == 200:
-                    output_text = response.output.choices[0].message.content
-                    
+                    output_content = response.output.choices[0].message.content
+
+                    # Handle case where content is a list (multimodal response)
+                    if isinstance(output_content, list):
+                        # Extract text from the list of content items
+                        text_parts = []
+                        for item in output_content:
+                            if isinstance(item, dict) and 'text' in item:
+                                text_parts.append(item['text'])
+                            elif isinstance(item, str):
+                                text_parts.append(item)
+                        output_text = ''.join(text_parts)
+                    else:
+                        output_text = output_content
+
                     # 创建兼容OpenAI格式的响应对象
                     class Choice:
                         class Message:

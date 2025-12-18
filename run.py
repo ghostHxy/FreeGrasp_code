@@ -131,10 +131,13 @@ def compute_grasp_pose(path, camera_info):
             presence_penalty=0
         )
         output = response.choices[0].message.content
+        print(f"[DEBUG] Qwen output type: {type(output)}, content: {output}")
         result = process_grasping_result(output, input_text)
+        print(f"[DEBUG] process_grasping_result: {result}")
 
         goal = result['class_name']
         goal_id = result['selected_object_id']
+        print(f"[DEBUG] labeled_text type: {type(labeled_text)}, content: {labeled_text[:200] if isinstance(labeled_text, str) else labeled_text}")
         goal_coor = get_coordinates(labeled_text, goal_id)
         if goal_coor is None:
             raise ValueError(f"Failed to find coordinates for goal_id={goal_id}")
