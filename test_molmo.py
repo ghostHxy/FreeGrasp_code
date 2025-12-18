@@ -13,25 +13,6 @@ from PIL import Image
 from transformers import AutoModelForCausalLM, AutoProcessor, GenerationConfig
 
 
-def patch_molmo_model(model):
-    """
-    Patch the Molmo model to fix the KV cache bug where past_key_values[0][0] is None.
-    """
-    original_forward = model.model.forward
-
-    def patched_forward(*args, **kwargs):
-        # Fix: Handle None values in past_key_values
-        past_key_values = kwargs.get('past_key_values', None)
-        if past_key_values is not None:
-            if isinstance(past_key_values, (list, tuple)) and len(past_key_values) > 0:
-                if past_key_values[0] is None or (isinstance(past_key_values[0], (list, tuple)) and past_key_values[0][0] is None):
-                    kwargs['past_key_values'] = None
-
-        return original_forward(*args, **kwargs)
-
-    model.model.forward = patched_forward
-    return model
-
 
 def main():
     print("=" * 60)
@@ -54,8 +35,7 @@ def main():
         device_map='auto'
     )
 
-    print("[3/4] Applying KV cache patch...")
-    model = patch_molmo_model(model)
+   
 
     # Find a test image
     image_paths = [
@@ -100,8 +80,7 @@ def main():
                     stop_strings=["<|endoftext|>"],
                     use_cache=True
                 ),
-                tokenizer=processor.tokenizer,
-                prefill_chunk_size=256
+                tokenizer=processor.tokenizer
             )
 
         # Decode output
