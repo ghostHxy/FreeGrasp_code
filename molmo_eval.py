@@ -272,6 +272,31 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
     
     print(f"[DEBUG] Molmo generated text: {labeled_text}")
 
+    # Extract points and save labeled image
+    image_w, image_h = image.size
+    points = extract_points(labeled_text, image_w, image_h)
+    points_with_ids = [(i + 1, x, y) for i, (x, y) in enumerate(points)]
+
+    # Save labeled image with point annotations
+    plt.figure(figsize=(12, 8))
+    plt.imshow(image)
+    for obj_id, x, y in points_with_ids:
+        plt.plot(x, y, 'ro', markersize=8)
+        plt.text(
+            x, y - 10, str(obj_id),
+            color="yellow", fontsize=12, fontweight="bold",
+            ha="center", va="bottom",
+            bbox=dict(facecolor="black", alpha=0.7, edgecolor="none", pad=2)
+        )
+    plt.axis("off")
+    plt.tight_layout()
+
+    # Save to the specified path
+    molmo_label_path = os.path.join(save_path, "molmo_label.png")
+    plt.savefig(molmo_label_path, bbox_inches="tight", pad_inches=0.1, dpi=150)
+    plt.close()
+    print(f"[DEBUG] Saved Molmo labeled image to: {molmo_label_path}")
+
     # Convert image to base64
     buffered = io.BytesIO()
     image.save(buffered, format="PNG")
