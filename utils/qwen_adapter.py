@@ -66,10 +66,9 @@ class QwenAdapter:
                                 # 提取base64图片
                                 image_url = item["image_url"]["url"]
                                 if image_url.startswith("data:image"):
-                                    # 提取base64部分
-                                    base64_data = image_url.split(",", 1)[1]
+                                    # 保留完整的data URI格式，Qwen API需要完整格式
                                     content.append({
-                                        "image": base64_data
+                                        "image": image_url
                                     })
                                 elif image_url.startswith("http"):
                                     # 如果是URL，直接使用
@@ -77,9 +76,9 @@ class QwenAdapter:
                                         "image": image_url
                                     })
                                 else:
-                                    # 假设是base64字符串
+                                    # 假设是base64字符串，添加前缀
                                     content.append({
-                                        "image": image_url
+                                        "image": f"data:image/png;base64,{image_url}"
                                     })
                     
                     qwen_messages.append({
