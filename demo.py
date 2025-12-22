@@ -15,13 +15,13 @@ os.makedirs(TMP_DIR, exist_ok=True)
 
 def read_file(path):
     if path is None:
-        return "File not found"
+        return "文件未找到"
     try:
         with open(path, 'r') as f:
             content = f.read()
         return content
     except Exception as e:
-        return f"Error reading file: {str(e)}"
+        return f"读取文件错误: {str(e)}"
 
 
 def exists(label, ext):
@@ -38,7 +38,7 @@ def get_grasp_pose(text_prompt, rgb_image, depth_file, _fx, _fy, _cx, _cy, _scal
             file.unlink()
 
     if depth_file is None:
-        raise ValueError("Depth file is required")
+        raise ValueError("请上传深度图文件")
 
     with np.load(depth_file.name) as data:
         depth = data['depth']
@@ -60,7 +60,7 @@ def get_grasp_pose(text_prompt, rgb_image, depth_file, _fx, _fy, _cx, _cy, _scal
     try:
         grasp_dict = compute_grasp_pose(TMP_DIR, camera)
     except Exception as e:
-        error_msg = f"Error in compute_grasp_pose: {str(e)}"
+        error_msg = f"计算抓取位姿出错: {str(e)}"
         print(f"⚠️ {error_msg}")
         grasp_dict = {"error": error_msg}
 
@@ -101,43 +101,41 @@ def create_pcd():
 def interface():
     with gr.Blocks() as demo:
         gr.Markdown(
-            "# 🦾 FreeGrasp: Free-form language-based robotic reasoning and grasping")
+            "# 🦾 FreeGrasp: 自由形式语言驱动的机器人推理与抓取系统")
 
         with gr.Row():
             with gr.Column(scale=1):
-                gr.Markdown("## Input")
-                input_text = gr.Textbox(label="Textual Prompt")
-                rgb_input = gr.Image(label="RGB", type="pil")
+                gr.Markdown("## 输入")
+                input_text = gr.Textbox(label="任务描述", placeholder="例如：拿起红色的杯子")
+                rgb_input = gr.Image(label="RGB 图像", type="pil")
                 depth_input = gr.File(
-                    label="Depth (.npz)", file_types=[".npz"])
+                    label="深度图 (.npz)", file_types=[".npz"])
 
-                gr.Markdown("## Camera intrinsics")
+                gr.Markdown("## 相机内参")
                 with gr.Group():
                     with gr.Row(equal_height=True):
-                        fx = gr.Number(label="fx", value=912.481)
-                        cx = gr.Number(label="cx", value=644.943)
+                        fx = gr.Number(label="fx (焦距x)", value=912.481)
+                        cx = gr.Number(label="cx (主点x)", value=644.943)
 
                     with gr.Row(equal_height=True):
-                        fy = gr.Number(label="fy", value=910.785)
-                        cy = gr.Number(label="cy", value=353.497)
+                        fy = gr.Number(label="fy (焦距y)", value=910.785)
+                        cy = gr.Number(label="cy (主点y)", value=353.497)
 
                     with gr.Row():
-                        scale = gr.Number(label="scale", value=1000.0)
+                        scale = gr.Number(label="scale (深度缩放)", value=1000.0)
 
-                submit_btn = gr.Button("Submit")
-
-            with gr.Column(scale=2):
-                gr.Markdown("## Pipeline")
-                molmo_output = gr.Image(label="Molmo")
-                gpt_output = gr.Textbox(label="You are a robotic system for bin picking, using a parallel gripper. I labeled all objects id in the image.\n"
-                                        "\nTask:\n"
-                                        "Given a target object description as input, determine the first object that needs to be grasped to enable picking the target object. If the target object is free of obstacles, return the target object ID itself. Otherwise, identify an object that is occluding the target and is itself free of obstacles. If multiple objects could be removed, return any one valid option.\n", lines=1)
-                mask_output = gr.Image(label="LangSAM")
+                submit_btn = gr.Button("开始处理", variant="primary")
 
             with gr.Column(scale=2):
-                gr.Markdown("## Output")
-                grasp_output = gr.Model3D(label="GraspNet")
-                grasp_json_output = gr.JSON()
+                gr.Markdown("## 处理流程")
+                molmo_output = gr.Image(label="Molmo 目标检测")
+                gpt_output = gr.Textbox(label="Qwen 推理结果", lines=1)
+                mask_output = gr.Image(label="LangSAM 分割结果")
+
+            with gr.Column(scale=2):
+                gr.Markdown("## 输出结果")
+                grasp_output = gr.Model3D(label="GraspNet 抓取姿态")
+                grasp_json_output = gr.JSON(label="抓取位姿数据")
 
         submit_btn.click(fn=get_grasp_pose, inputs=[input_text, rgb_input, depth_input, fx, fy, cx, cy, scale],
                          outputs=[molmo_output, gpt_output, mask_output, grasp_output, grasp_json_output])
