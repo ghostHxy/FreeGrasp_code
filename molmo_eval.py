@@ -278,29 +278,37 @@ def process_and_send_to_gpt(image_path, prompt, save_path):
     points_with_ids = [(i + 1, x, y) for i, (x, y) in enumerate(points)]
 
     # Save labeled image with point annotations
-    plt.figure(figsize=(12, 8))
-    plt.imshow(image)
+    fig, ax = plt.subplots(figsize=(12, 8))
+    ax.imshow(image)
     for obj_id, x, y in points_with_ids:
-        plt.plot(x, y, 'ro', markersize=8)
-        plt.text(
-            x, y - 10, str(obj_id),
-            color="yellow", fontsize=12, fontweight="bold",
+        ax.plot(x, y, 'ro', markersize=10)
+        ax.text(
+            x, y - 15, str(obj_id),
+            color="yellow", fontsize=14, fontweight="bold",
             ha="center", va="bottom",
-            bbox=dict(facecolor="black", alpha=0.7, edgecolor="none", pad=2)
+            bbox=dict(facecolor="black", alpha=0.8, edgecolor="yellow", linewidth=1, pad=3)
         )
-    plt.axis("off")
+    ax.axis("off")
     plt.tight_layout()
 
     # Save to the specified path
     molmo_label_path = os.path.join(save_path, "molmo_label.png")
-    plt.savefig(molmo_label_path, bbox_inches="tight", pad_inches=0.1, dpi=150)
-    plt.close()
+    fig.savefig(molmo_label_path, bbox_inches="tight", pad_inches=0.1, dpi=150)
     print(f"[DEBUG] Saved Molmo labeled image to: {molmo_label_path}")
 
-    # Convert image to base64
+    # ✅ Fix: Convert the LABELED image to base64 (not the original image)
     buffered = io.BytesIO()
-    image.save(buffered, format="PNG")
+    fig.savefig(buffered, format="PNG", bbox_inches="tight", pad_inches=0.1, dpi=150)
+    buffered.seek(0)
     base64_labeled_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    plt.close(fig)
+
+    # Save debug image to verify what's being sent to Qwen
+    debug_path = os.path.join(save_path, "debug_sent_to_qwen.png")
+    with open(debug_path, "wb") as f:
+        buffered.seek(0)
+        f.write(buffered.read())
+    print(f"[DEBUG] Saved debug image (sent to Qwen) to: {debug_path}")
 
     return base64_labeled_image, labeled_text
 
