@@ -13,14 +13,36 @@ from utils.utils import *
 from utils.config import *
 from utils.graspnet_utils import get_correct_pose
 
+# 可选的调试可视化模块（导入失败不影响主流程）
+try:
+    from utils.debug_visualizer import DebugVisualizer
+    DEBUG_VIS_AVAILABLE = True
+except ImportError as e:
+    print(f"[Warning] Debug visualizer not available: {e}")
+    DEBUG_VIS_AVAILABLE = False
+    DebugVisualizer = None
 
-def compute_grasp_pose(path, camera_info):
+
+def compute_grasp_pose(path, camera_info, debug_vis=True):
     """
     Compute grasp pose for a given scene folder.
     Expects image.png, depth.npz, task.txt inside `path`.
+
+    Args:
+        path: 场景文件夹路径
+        camera_info: 相机参数
+        debug_vis: 是否启用调试可视化（默认True）
     """
     parser = argparse.ArgumentParser('RUN an experiment with real data', parents=[get_args_parser()])
     args = parser.parse_args()
+
+    # 初始化调试可视化器（安全初始化，失败不影响主流程）
+    visualizer = None
+    if debug_vis and DEBUG_VIS_AVAILABLE:
+        try:
+            visualizer = DebugVisualizer(output_dir=path, enabled=True)
+        except Exception as e:
+            print(f"[Warning] Failed to init DebugVisualizer: {e}")
 
     try:
         # --------------------------
@@ -121,6 +143,11 @@ def compute_grasp_pose(path, camera_info):
         ]
 
         from utils.config import QWEN_MODEL
+
+        # [Debug Vis 1] 保存 Qwen prompts
+        if visualizer:
+            visualizer.save_qwen_prompts(messages, input_text)
+
         response = client.chat.completions.create(
             model=QWEN_MODEL,
             messages=messages,
@@ -134,6 +161,10 @@ def compute_grasp_pose(path, camera_info):
         print(f"[DEBUG] Qwen output type: {type(output)}, content: {output}")
         result = process_grasping_result(output, input_text)
         print(f"[DEBUG] process_grasping_result: {result}")
+
+        # [Debug Vis 2] 保存 Qwen output
+        if visualizer:
+            visualizer.save_qwen_output(output, result)
 
         goal = result['class_name']
         goal_id = result['selected_object_id']
@@ -160,12 +191,27 @@ def compute_grasp_pose(path, camera_info):
         print(f"[DEBUG] LangSAM returned: masks={masks}, boxes={boxes}")
         if masks is None or boxes is None or len(masks) == 0:
             raise ValueError(f"LangSAM prediction failed for {image_path}, goal={goal}")
+
+        # [Debug Vis 3] 保存 LangSAM 所有掩码可视化
+        if visualizer:
+            visualizer.save_langsam_all_masks(image_pil, masks, boxes, logits, goal)
+
         goal_mask, mask_index = get_goal_mask_with_index(masks, goal_coor)
         print(f"[DEBUG] goal_mask type={type(goal_mask)}, mask_index={mask_index}")
         if goal_mask is None:
             raise ValueError(f"Failed to get goal mask for {image_path}, goal_coor={goal_coor}")
+
+        # [Debug Vis 4] 保存坐标匹配可视化
+        if visualizer:
+            visualizer.save_coordinate_matching(image_pil, masks, goal_coor, mask_index)
+
         goal_bbox = boxes[mask_index].cpu().numpy()
         cropping_box = create_cropping_box_from_boxes(goal_bbox, (img_ori.shape[1], img_ori.shape[0]))
+
+        # [Debug Vis 5] 保存最终选中的掩码
+        if visualizer:
+            visualizer.save_final_selected_mask(image_pil, goal_mask, goal_bbox)
+
         goal_mask = goal_mask.unsqueeze(0)
         print(f"LangSAM masks: {len(masks)}, boxes: {len(boxes)}")
         print(f"Goal coordinates: {goal_coor}, mask_index: {mask_index}")
@@ -178,6 +224,18 @@ def compute_grasp_pose(path, camera_info):
         # --------------------------
         # GraspNet
         # --------------------------
+        # [Debug Vis 6 & 7] 保存 RGB + 掩码 + 点云可视化（完全隔离，不影响主流程）
+        if visualizer:
+            try:
+                visualizer.save_rgb_with_mask_for_pointcloud(img_ori, goal_mask, cropping_box)
+                # 生成完整场景点云用于可视化
+                from models.FGC_graspnet.utils.data_utils import create_point_cloud_from_depth_image
+                cloud_full = create_point_cloud_from_depth_image(depth_ori, camera_info, organized=True)
+                color_full = img_ori.astype(np.float32) / 255.0
+                visualizer.save_scene_pointcloud(cloud_full, color_full, goal_mask.squeeze(0), depth_ori, camera_info)
+            except Exception as e:
+                print(f"[Warning] Point cloud visualization failed: {e}")
+
         endpoint, pcd = get_and_process_data(cropping_box, img_ori, depth_ori, camera_info, viz=args.viz)
         grasp_net = grasp_model(args=args, device="cuda", image=img_ori, mask=goal_mask, camera_info=camera_info)
         gg, _ = grasp_net.forward(endpoint, pcd, path)
@@ -193,6 +251,22 @@ def compute_grasp_pose(path, camera_info):
             }
             with open(os.path.join(path, "grasp_pose.json"), 'w') as f:
                 json.dump(data, f, indent=4)
+
+        # [Debug Vis] 保存运行摘要
+        if visualizer:
+            visualizer.save_summary({
+                'task_input': input_text,
+                'qwen_output': output,
+                'parsed_result': result,
+                'goal_class': goal,
+                'goal_id': goal_id,
+                'goal_coordinates': goal_coor,
+                'num_langsam_masks': len(masks),
+                'selected_mask_index': mask_index,
+                'cropping_box': cropping_box,
+                'num_grasps_found': len(gg),
+                'grasp_pose': data
+            })
 
         return data
 
