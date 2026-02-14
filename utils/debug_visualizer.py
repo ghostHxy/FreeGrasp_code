@@ -493,6 +493,7 @@ class DebugVisualizer:
             ax1.set_title('Scene Point Cloud\n(Target Object Highlighted in Green)',
                          fontsize=11, fontweight='bold')
             ax1.view_init(elev=25, azim=-60)
+            ax1.invert_zaxis()
 
             # 右图：仅目标物体点云
             ax2 = fig.add_subplot(122, projection='3d')
@@ -511,6 +512,7 @@ class DebugVisualizer:
                 ax2.set_title(f'Target Object Point Cloud\n({np.sum(target)} points)',
                              fontsize=11, fontweight='bold')
                 ax2.view_init(elev=30, azim=-45)
+                ax2.invert_zaxis()
 
             plt.tight_layout()
             plt.savefig(output_path, dpi=150, bbox_inches='tight')
